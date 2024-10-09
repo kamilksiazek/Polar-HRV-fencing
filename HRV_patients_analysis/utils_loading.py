@@ -50,6 +50,7 @@ Tarnowskie Góry, Poland.
 """
 
 import pickle
+import glob
 import pandas as pd
 import numpy as np
 from typing import List
@@ -305,32 +306,61 @@ def load_results_file(fname):
         return pickle.load(fobj)
 
 
-if __name__ == "__main__":
-    main_folder = (
-        '/data/anonimized_accelerometer_data/'
+def concat_files(path,
+                 measurement_type,
+                 save=False):
+    """
+    Load more files as Pandas dataframes, concat them
+    and (optionally) save as a single file.
+
+    Arguments:
+    ----------
+     *path* (string): path to the location with .txt files
+                      with measurements
+     *measurement_type* (string): type of measurements to load;
+                        options: 'HR', 'RR', 'ACC', 'ECG'
+     *save* (Boolean): defines whether a concatenated file should
+                       be saved to .csv file or not; default: False
+
+    Returns:
+    --------
+     *concatenated_frame* (Pandas dataframe) stores a concatenated
+                          file
+      OR None in situations in which there is no file which meets
+      specific conditions.
+    """
+
+    files = glob.glob(f'{path}/*{measurement_type}.txt')
+
+    if len(files) == 0:
+        print('There is no file which meets specific conditions!')
+        return None
+
+    dataframes = []
+    for cur_table in files:
+        dataframes.append(
+            pd.read_csv(cur_table, delimiter=';')
+        )
+    concatenated_frame = pd.concat(dataframes, ignore_index=True)
+    concatenated_frame = concatenated_frame.sort_values(
+        'Phone timestamp', ignore_index=True)
+    # FIXME: If there is more than one value per a given timestamp
+    # other values are removed, only the first one is stored.
+    concatenated_frame.drop_duplicates(
+        subset=['Phone timestamp'], keep='first', inplace=True,
+        ignore_index=True
     )
 
-    # Plot accelerometer data
-    folder_for_ACC_plots = '../Plots/raw_accelerometer_data/'
-    for group in ['control', 'treatment']:
-        for person in range(1, 49):
-            if (group == 'treatment' and (
-                person in [5, 6, 10, 11, 12, 14, 18, 28, 30, 34, 35, 39] or
-                person > 42)) or \
-               (group == 'control' and (
-                person > 48 or
-                person in [1, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-                           12, 13, 14, 15, 17, 23, 27, 48])):
-                continue
-            else:
-                data = load_data_for_single_person(
-                    main_folder,
-                    group,
-                    person,
-                    'ACC'
-                )
-                plot_accelerometer_data(
-                    data,
-                    folder_for_ACC_plots,
-                    name=f'{group}_{person}'
-                )
+    if save:
+        files.sort()
+        name = files[0][(files[0].rfind('/') + 1):files[0].rfind('.txt')]
+        folder = files[0][:files[0].rfind('/')]
+        concatenated_frame.to_csv(f'{folder}/{name}_full.txt',
+                                  index=False,
+                                  sep=';')
+
+    return concatenated_frame
+
+
+if __name__ == "__main__":
+    pass

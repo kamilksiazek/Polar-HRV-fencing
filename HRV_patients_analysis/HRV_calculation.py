@@ -88,6 +88,29 @@ def RMSSD_HRV_calculation(data):
     return HRV
 
 
+def SDNN_HRV_calculation(data):
+    """
+    Calculate standard deviation of RR intervals without outliers.
+
+    Arguments:
+    ----------
+       *data*: (Pandas series) data including RR-intervals' values
+
+    Returns:
+    --------
+      (float) HRV value
+    """
+    # In the case of empty Series or Series with one elements
+    if len(data) in [0, 1]:
+        return 0
+    else:
+        # Remove time intervals having values larger than 2 seconds
+        outliers = data.loc[lambda x: x > 2000]
+        RR_intervals = data.drop(outliers.index)
+        HRV = RR_intervals.std(ddof=0)
+        return HRV
+
+
 def calculate_mean_HRV_based_on_windows(row, method):
     """
     Modify each row of Pandas dataframe by the calculation
@@ -285,7 +308,8 @@ def calculate_HRV_in_windows(data: pd.DataFrame,
         *method*: (str) method of HRV calculation;
                   possible options:
                   - RMSSD - root mean square of successive differences
-
+                  - SDNN - standard deviation of RR intervals without
+                           anomalies
     Returns:
     --------
         *HRV_divided_series*: (Numpy array) contains HRV values for consecutive
@@ -311,6 +335,9 @@ def calculate_HRV_in_windows(data: pd.DataFrame,
         if len(divided_series[i]) > 1:
             if method == 'RMSSD':
                 HRV_divided_series[i] = RMSSD_HRV_calculation(
+                    divided_series[i])
+            elif method == 'SDNN':
+                HRV_divided_series[i] = SDNN_HRV_calculation(
                     divided_series[i])
             else:
                 raise NotImplementedError
